@@ -80,7 +80,7 @@ public interface FsCrawlerDocumentService extends FsCrawlerService {
     ESSearchResponse search(ESSearchRequest request) throws IOException, ElasticsearchClientException;
 
     /**
-     * Remove a document from the target service
+     * Check the document exists in the given service
      * @param index     Index name
      * @param id        Document ID
      * @return true if the document exists

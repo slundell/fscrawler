@@ -269,23 +269,31 @@ public abstract class FsParserAbstract extends FsParser {
                             if (child.getLastModifiedDate().isAfter(lastScanDate) ||
                                     (child.getCreationDate() != null && child.getCreationDate().isAfter(lastScanDate))) {
                                 if (isFileSizeUnderLimit(fsSettings.getFs().getIgnoreAbove(), child.getSize())) {
-                                    InputStream inputStream = null;
-                                    try {
-                                        if (fsSettings.getFs().isIndexContent() || fsSettings.getFs().isStoreSource()) {
-                                            inputStream = path.getInputStream(child);
+                                    
+                                    
+                                    String id = generateIdFromFilename(filename, filepath);
+                                    String index = this.fsSettings.getElasticsearch().getIndex();
+                                    if (!this.documentService.exists(index, id)) {
+                                        InputStream inputStream = null;
+                                        try {
+                                            if (fsSettings.getFs().isIndexContent() || fsSettings.getFs().isStoreSource()) {
+                                                inputStream = path.getInputStream(child);
+                                            }
+                                            indexFile(child, stats, filepath, inputStream, child.getSize());
+                                            stats.addFile();
+                                        } catch (Exception e) {
+                                            if (fsSettings.getFs().isContinueOnError()) {
+                                                logger.warn("Unable to index {}, skipping...: {}", filename, e.getMessage());
+                                            } else {
+                                                throw e;
+                                            }
+                                        } finally {
+                                            if (inputStream != null) {
+                                                path.closeInputStream(inputStream);
+                                            }
                                         }
-                                        indexFile(child, stats, filepath, inputStream, child.getSize());
-                                        stats.addFile();
-                                    } catch (Exception e) {
-                                        if (fsSettings.getFs().isContinueOnError()) {
-                                            logger.warn("Unable to index {}, skipping...: {}", filename, e.getMessage());
-                                        } else {
-                                            throw e;
-                                        }
-                                    } finally {
-                                        if (inputStream != null) {
-                                            path.closeInputStream(inputStream);
-                                        }
+                                    } else {
+                                        logger.warn("file [{}] is already indexed. Skipping...", filename);
                                     }
                                 } else {
                                     logger.debug("file [{}] has a size [{}] above the limit [{}]. We skip it.", filename,
@@ -382,7 +390,7 @@ public abstract class FsParserAbstract extends FsParser {
         final String extension = fileAbstractModel.getExtension();
         final long size = fileAbstractModel.getSize();
 
-        logger.debug("fetching content from [{}],[{}]", dirname, filename);
+        logger.info("Indexing [{}]", filename);
         String fullFilename = computeRealPathName(dirname, filename);
 
         // Create the Doc object (only needed when we have add_as_inner_object: true (default) or when we don't index json or xml)
